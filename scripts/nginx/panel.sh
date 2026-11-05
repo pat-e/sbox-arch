@@ -10,10 +10,13 @@
 #   under the GPL along with build & install instructions.
 #
 
-echo "HOST = '127.0.0.1'" >> /opt/swizzin/swizzin.cfg
+cat >> /opt/swizzin/swizzin.cfg << 'EOF'
+HOST = '127.0.0.1'
+URLBASE = '/panel'
+EOF
 
 cat > /etc/nginx/apps/panel.conf << 'EON'
-location / {
+location /panel {
   #rewrite ^/panel/(.*) /$1 break;
   proxy_set_header Host $host;
   proxy_set_header X-Real-IP $remote_addr;

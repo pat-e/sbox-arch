@@ -5,6 +5,6 @@
 
 check_service "panel" || BAD=true
 check_port_curl "panel" || BAD=true
-check_nginx "" || BAD=true
+check_nginx "panel" || BAD=true
 
 evaluate_bad "panel"
