@@ -1,6 +1,7 @@
 .dev.lock
 .test.lock
 dev.env
+debug.md
 
 # Ignore JetBrains IDE's project settings folder
 .idea/**
