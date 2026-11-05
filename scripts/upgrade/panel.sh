@@ -19,10 +19,12 @@ if [[ -f /install/.panel.lock ]]; then
         rm -rf opt/swizzin/core/custom.tmp
     fi
     echo_progress_done "Commits pulled"
-    echo_progress_start "Checking pip for new panel dependencies"
+    echo_progress_start "Checking for new panel dependencies via uv"
+    #shellcheck source=sources/functions/pyenv
+    . /etc/swizzin/sources/functions/pyenv
     if ! /opt/.venv/swizzin/bin/python /opt/swizzin/tests/test_requirements.py >> ${log} 2>&1; then
-        /opt/.venv/swizzin/bin/pip install --upgrade pip wheel >> ${log} 2>&1
-        /opt/.venv/swizzin/bin/pip install -r /opt/swizzin/requirements.txt >> ${log} 2>&1
+        uv_pip_install /opt/.venv/swizzin --upgrade pip wheel 'setuptools<81' >> ${log} 2>&1
+        uv_pip_install /opt/.venv/swizzin -r /opt/swizzin/requirements.txt >> ${log} 2>&1
         chown -R swizzin: /opt/.venv/swizzin
     fi
     echo_progress_done "Depends up-to-date"

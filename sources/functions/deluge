@@ -245,7 +245,7 @@ function build_deluge() {
     fi
     case $DELUGE_VERSION in
         2.2.x | 2.1.x | 2.0.x)
-            LIST='python python-setuptools python-pip intltool python-zope-interface python-twisted python-pyopenssl python-pyxdg python-chardet python-mako python-packaging python-setproctitle python-rencode python-pillow librsvg xdg-utils'
+            LIST='python python-setuptools uv intltool python-zope-interface python-twisted python-pyopenssl python-pyxdg python-chardet python-mako python-packaging python-setproctitle python-rencode python-pillow librsvg xdg-utils'
             pythonver=python3
             distver=python3
             ;;
@@ -264,9 +264,9 @@ function build_deluge() {
 
     if [[ -n $PIP ]]; then
         . /etc/swizzin/sources/functions/pyenv
-        python_getpip
+        ensure_uv
         for p in $PIP; do
-            pip install $p >> $log 2>&1
+            uv pip install --system --break-system-packages $p >> $log 2>&1
         done
     fi
 
@@ -281,7 +281,7 @@ function build_deluge() {
     cd /tmp/deluge
     VERSION=$(git describe | cut -d- -f2)
     sed -i 's/-dev//g' setup.cfg
-    ${pythonver} -m pip install --break-system-packages . >> "${log}" 2>&1 || ${pythonver} setup.py install --prefix=/usr >> "${log}" 2>&1
+    uv pip install --system --break-system-packages . >> "${log}" 2>&1 || ${pythonver} setup.py install --prefix=/usr >> "${log}" 2>&1
     cd /tmp
     rm -rf /tmp/deluge
     echo_progress_done "Deluge installed"

@@ -26,11 +26,13 @@ function _download_latest() {
     }
     rm -f /tmp/mylar.tar.gz
     echo_progress_done
-    echo_progress_start "Fixing dependencies"
-    /opt/.venv/mylar/bin/pip install --upgrade pip &>> "${log}"
-    /opt/.venv/mylar/bin/pip install -r /opt/mylar/requirements.txt &>> "${log}"
+    echo_progress_start "Fixing dependencies via uv"
+    #shellcheck source=sources/functions/pyenv
+    . /etc/swizzin/sources/functions/pyenv
+    uv_pip_install /opt/.venv/mylar --upgrade pip &>> "${log}"
+    uv_pip_install /opt/.venv/mylar -r /opt/mylar/requirements.txt &>> "${log}"
     # hotfix for urllib3 breaking stuff
-    /opt/.venv/mylar/bin/pip install 'urllib3<2'
+    uv_pip_install /opt/.venv/mylar 'urllib3<2' &>> "${log}"
     chown -R "${mylar_owner}": /opt/mylar/
     chown -R "${mylar_owner}": /opt/.venv/mylar/
 }

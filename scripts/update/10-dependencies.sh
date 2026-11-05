@@ -4,7 +4,7 @@
 pac_update
 
 # Space-separated list of required GLOBAL SWIZZIN dependencies (NOT application specific ones)
-dependencies="libnewt git sudo curl wget lsof syslog-ng fail2ban apache vnstat tcl base-devel gnupg bc util-linux jq net-tools cracklib unzip cronie psmisc which"
+dependencies="libnewt git sudo curl wget lsof syslog-ng fail2ban apache vnstat tcl base-devel gnupg bc util-linux jq net-tools cracklib unzip cronie psmisc which uv"
 
 pac_install $dependencies
 

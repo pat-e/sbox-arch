@@ -16,26 +16,10 @@ mylar_owner="${mylar_owner:-$(_get_master_username)}"
 echo_info "Setting Mylar owner = ${mylar_owner}"
 swizdb set "mylar/owner" "${mylar_owner}"
 
-if ver_compare "${systempy3_ver}" lt 3.7.5; then
-    pyenv_install="true"
-    dependency_list=("git" "sqlite")
-else
-    dependency_list=("git" "python" "python-pip" "sqlite")
-fi
-
+dependency_list=("git" "python" "uv" "sqlite")
 pac_install "${dependency_list[@]}"
 
-case "${pyenv_install}" in
-    true)
-        pyenv_install
-        pyenv_install_version 3.8.1
-        pyenv_create_venv 3.8.1 /opt/.venv/mylar
-        chown -R "${mylar_owner}": /opt/.venv/mylar
-        ;;
-    *)
-        python3_venv "${mylar_owner}" mylar
-        ;;
-esac
+python3_venv "${mylar_owner}" mylar
 
 _download_latest
 echo_progress_done

@@ -46,11 +46,11 @@ function _install_dependencies_calibreweb() {
 }
 
 function _install_calibreweb() {
-    pac_install python python-pip python-virtualenv
-    mkdir -p /opt/.venv/calibreweb
-    echo_progress_start "Creating venv for calibreweb"
-    python3 -m venv /opt/.venv/calibreweb
-    echo_progress_done "Venv created"
+    #shellcheck source=sources/functions/pyenv
+    . /etc/swizzin/sources/functions/pyenv
+    pac_install python uv
+    useradd $clbWebUser --system -d "$calibrewebdir" >> $log 2>&1 || true
+    python3_venv ${clbWebUser} calibreweb
 
     echo_progress_start "Downloading calibreweb source code archive"
     dlurl=$(curl -s https://api.github.com/repos/janeczku/calibre-web/releases/latest | jq -r '.zipball_url') || {
@@ -72,18 +72,18 @@ function _install_calibreweb() {
     echo_progress_done
 
     echo_progress_start "Creating users and setting permissions"
-    useradd $clbWebUser --system -d "$calibrewebdir" >> $log 2>&1
     chown -R $clbWebUser:$clbWebUser $calibrewebdir
     chown -R ${clbWebUser}: /opt/.venv/calibreweb
     #This bit right here will ensure that the system user created will have access to the master user's folders where he might have the CalibreDB
     usermod -a -G "${CALIBRE_LIBRARY_USER}" $clbWebUser >> $log 2>&1
     echo_progress_done
 
-    echo_progress_start "Installing python dependencies"
-    sudo -u ${clbWebUser} bash -c "/opt/.venv/calibreweb/bin/pip3 install -r $calibrewebdir/requirements.txt" >> $log 2>&1
+    echo_progress_start "Installing python dependencies via uv"
+    uv_pip_install /opt/.venv/calibreweb -r "$calibrewebdir/requirements.txt" >> $log 2>&1
     #fuck ldap. all my homies hate ldap
     sed '/ldap/Id' -i $calibrewebdir/optional-requirements.txt
-    sudo -u ${clbWebUser} bash -c "/opt/.venv/calibreweb/bin/pip3 install -r $calibrewebdir/optional-requirements.txt" >> $log 2>&1
+    uv_pip_install /opt/.venv/calibreweb -r "$calibrewebdir/optional-requirements.txt" >> $log 2>&1
+    chown -R ${clbWebUser}: /opt/.venv/calibreweb
     echo_progress_done
 }
 

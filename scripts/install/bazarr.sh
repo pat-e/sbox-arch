@@ -15,25 +15,9 @@ _install() {
     user=$(cut -d: -f1 < /root/.master.info)
     #shellcheck source=sources/functions/pyenv
     . /etc/swizzin/sources/functions/pyenv
-    systempy3_ver=$(get_candidate_version python)
 
-    if ver_compare "${systempy3_ver}" lt 3.8.0; then
-        PYENV=True
-    fi
-
-    pac_install python python-pip python-lxml python-numpy python-gevent python-pillow libxml2 libxslt ffmpeg unrar unzip
-
-    case ${PYENV} in
-        True)
-            pyenv_install
-            pyenv_install_version 3.11.3
-            pyenv_create_venv 3.11.3 /opt/.venv/bazarr
-            chown -R ${user}: /opt/.venv/bazarr
-            ;;
-        *)
-            python3_venv ${user} bazarr
-            ;;
-    esac
+    pac_install python uv python-lxml python-numpy python-gevent python-pillow libxml2 libxslt ffmpeg unrar unzip
+    python3_venv ${user} bazarr
 
     echo_progress_start "Downloading bazarr source"
     wget https://github.com/morpheus65535/bazarr/releases/latest/download/bazarr.zip -O /tmp/bazarr.zip >> $log 2>&1 || {
@@ -54,11 +38,12 @@ _install() {
 
     chown -R "${user}": /opt/bazarr
 
-    echo_progress_start "Installing python dependencies"
-    sudo -u "${user}" bash -c "/opt/.venv/bazarr/bin/pip3 install -r /opt/bazarr/requirements.txt" >> $log 2>&1 || {
+    echo_progress_start "Installing python dependencies via uv"
+    uv_pip_install /opt/.venv/bazarr -r /opt/bazarr/requirements.txt >> $log 2>&1 || {
         echo_error "Dependencies failed to install"
         exit 1
     }
+    chown -R "${user}": /opt/.venv/bazarr
     mkdir -p /opt/bazarr/data/config/
     echo_progress_done "Dependencies installed"
 }

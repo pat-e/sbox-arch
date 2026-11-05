@@ -29,36 +29,18 @@ master=$(_get_master_username)
 
 useradd -r swizzin -s /usr/bin/nologin > /dev/null 2>&1
 
-systempy3_ver=$(get_candidate_version python)
-
-if ver_compare "${systempy3_ver}" lt 3.6.0; then
-    LIST='git acl'
-    PYENV=True
-else
-    LIST='python python-pip git acl'
-fi
-
+LIST='python uv git acl'
 pac_install $LIST
 
-case ${PYENV} in
-    True)
-        pyenv_install
-        pyenv_install_version 3.8.6
-        pyenv_create_venv 3.8.6 /opt/.venv/swizzin
-        chown -R swizzin: /opt/.venv/swizzin
-        ;;
-    *)
-        python3_venv swizzin swizzin
-        ;;
-esac
+python3_venv swizzin swizzin
 
 echo_progress_start "Cloning panel"
 git clone https://github.com/liaralabs/swizzin_dashboard.git /opt/swizzin >> ${log} 2>&1
 echo_progress_done "Panel cloned"
 
-echo_progress_start "Installing python dependencies"
-/opt/.venv/swizzin/bin/pip install --upgrade pip wheel >> ${log} 2>&1
-/opt/.venv/swizzin/bin/pip install -r /opt/swizzin/requirements.txt >> ${log} 2>&1
+echo_progress_start "Installing python dependencies via uv"
+uv_pip_install /opt/.venv/swizzin --upgrade pip wheel 'setuptools<81' >> ${log} 2>&1
+uv_pip_install /opt/.venv/swizzin -r /opt/swizzin/requirements.txt >> ${log} 2>&1
 echo_progress_done
 
 echo_progress_start "Setting permissions"

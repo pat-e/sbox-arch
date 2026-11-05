@@ -18,7 +18,7 @@ if [[ -f /install/.panel.lock ]]; then
         if [[ -d /opt/swizzin/venv ]]; then
             echo_progress_start "Moving swizzin venv to /opt/.venv"
             mkdir -p /opt/.venv
-            python3 -m venv /opt/.venv/swizzin
+            python3_venv swizzin swizzin
             rm -rf /opt/swizzin/venv
             mv /opt/swizzin/swizzin/* /opt/swizzin/swizzin/.git /opt/swizzin
             rm_if_exists "/opt/swizzin/swizzin"
@@ -33,10 +33,7 @@ if [[ -f /install/.panel.lock ]]; then
 
         if ver_compare ${pyenv_version} lt ${pyminver}; then
             rm_if_exists "/opt/.venv/swizzin"
-            pyenv_install
-            pyenv_install_version 3.8.6
-            pyenv_create_venv 3.8.6 /opt/.venv/swizzin
-            chown -R swizzin: /opt/.venv/swizzin
+            python3_venv swizzin swizzin
         fi
 
         chown -R swizzin: /opt/swizzin

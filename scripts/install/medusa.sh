@@ -5,17 +5,11 @@
 user=$(cut -d: -f1 < /root/.master.info)
 #shellcheck source=sources/functions/utils
 . /etc/swizzin/sources/functions/utils
+#shellcheck source=sources/functions/pyenv
+. /etc/swizzin/sources/functions/pyenv
 
-mkdir -p /opt/.venv
-chown ${user}: /opt/.venv
-
-pac_install git openssl python unrar
-
-# maybe TODO pyenv this up and down?
-echo_progress_start "Making venv for medusa"
-python3 -m venv /opt/.venv/medusa
-chown -R ${user}: /opt/.venv/medusa
-echo_progress_done
+pac_install git openssl python uv unrar
+python3_venv ${user} medusa
 
 install_rar
 

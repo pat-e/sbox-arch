@@ -7,19 +7,13 @@ if [[ -f /install/.calibreweb.lock ]]; then
         systemctl daemon-reload
     fi
 
-    pip_version=$(/opt/.venv/calibreweb/bin/pip -V | cut -d' ' -f2)
-    if ver_compare "$pip_version" lt "23.0"; then
-        echo_progress_start "Upgrading pip for Calibre Web"
-        /opt/.venv/calibreweb/bin/pip install --upgrade pip >> ${log} 2>&1
-        echo_progress_done
-    fi
-
     #shellcheck source=sources/functions/pyenv
     . /etc/swizzin/sources/functions/pyenv
 
     if ! python3_check_reqs calibreweb /opt/calibreweb/requirements.txt; then
-        echo_progress_start "Updating Calibre Web requirements"
-        /opt/.venv/calibreweb/bin/pip install -r /opt/calibreweb/requirements.txt >> ${log} 2>&1
+        echo_progress_start "Updating Calibre Web requirements via uv"
+        uv_pip_install /opt/.venv/calibreweb -r /opt/calibreweb/requirements.txt >> ${log} 2>&1
+        chown -R calibreweb: /opt/.venv/calibreweb
         if systemctl is-enabled calibreweb > /dev/null 2>&1 &&
             [[ "$(tail -n 1 /opt/calibreweb/calibre-web.log | grep -c 'webserver stop (restart=True)')" -eq 1 ]]; then
             systemctl restart calibreweb

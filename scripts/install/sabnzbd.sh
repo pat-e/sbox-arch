@@ -23,31 +23,12 @@ latestversion=$(github_latest_version sabnzbd/sabnzbd) || {
 }
 latest="https://github.com/sabnzbd/sabnzbd/archive/refs/tags/${latestversion}.tar.gz"
 
-systempy3_ver=$(get_candidate_version python)
-
-#Version 4.0 is going to raise the min python version to 3.8 so we have to differentiate whether or not to build a pyenv
-if ver_compare "${systempy3_ver}" lt 3.8.0 && ver_compare "${latestversion}" ge 3.5.0; then
-    LIST='par2cmdline p7zip unrar ffmpeg libffi openssl glib2 dbus'
-    PYENV=True
-else
-    LIST='par2cmdline p7zip unrar python python-setuptools python-pip ffmpeg libffi openssl glib2 dbus'
-fi
-
+LIST='par2cmdline p7zip unrar python uv ffmpeg libffi openssl glib2 dbus'
 pac_install $LIST
 aur_install --ignore-errors sabyenc3
 install_rar
 
-case ${PYENV} in
-    True)
-        pyenv_install
-        pyenv_install_version 3.11.3
-        pyenv_create_venv 3.11.3 /opt/.venv/sabnzbd
-        chown -R ${user}: /opt/.venv/sabnzbd
-        ;;
-    *)
-        python3_venv ${user} sabnzbd
-        ;;
-esac
+python3_venv ${user} sabnzbd
 
 echo_progress_start "Downloading and extracting sabnzbd"
 mkdir -p /opt/sabnzbd
@@ -59,10 +40,9 @@ tar xzf /tmp/sabnzbd.tar.gz --strip-components=1 -C /opt/sabnzbd >> "${log}" 2>&
 rm -rf /tmp/sabnzbd.tar.gz
 echo_progress_done
 
-echo_progress_start "Installing pip requirements"
-
-/opt/.venv/sabnzbd/bin/pip install --upgrade pip wheel >> "${log}" 2>&1
-/opt/.venv/sabnzbd/bin/pip install -r /opt/sabnzbd/requirements.txt >> "${log}" 2>&1
+echo_progress_start "Installing python requirements via uv"
+uv_pip_install /opt/.venv/sabnzbd --upgrade pip wheel >> "${log}" 2>&1
+uv_pip_install /opt/.venv/sabnzbd -r /opt/sabnzbd/requirements.txt >> "${log}" 2>&1
 echo_progress_done
 
 chown -R ${user}: /opt/.venv/sabnzbd
