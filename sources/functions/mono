@@ -1,0 +1,13 @@
+#!/bin/bash
+
+function mono_repo_setup() {
+    :
+}
+
+function mono_repo_update() {
+    if ! command -v mono > /dev/null 2>&1; then
+        pac_install mono
+    else
+        pac_install --only-upgrade mono
+    fi
+}

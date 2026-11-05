@@ -1,0 +1,66 @@
+#!/bin/bash
+# rtorrent upgrade/downgrade/reinstall script
+# Author: liara
+
+if [[ ! -f /install/.rtorrent.lock ]]; then
+    echo_error "rTorrent doesn't appear to be installed. What do you hope to accomplish by running this script?"
+    exit 1
+fi
+
+#shellcheck source=sources/functions/rtorrent
+. /etc/swizzin/sources/functions/rtorrent
+#shellcheck source=sources/functions/curl
+. /etc/swizzin/sources/functions/curl
+whiptail_rtorrent
+
+user=$(cut -d: -f1 < /root/.master.info)
+rutorrent="/srv/rutorrent/"
+users=($(cut -d: -f1 < /etc/htpasswd))
+
+if [[ -n $noexec ]]; then
+    mount -o remount,exec /tmp
+    noexec=1
+fi
+echo_progress_start "Removing old rTorrent binaries and libraries ... "
+if check_installed rtorrent; then
+    remove_rtorrent
+else
+    remove_rtorrent_legacy
+fi
+echo_progress_done
+
+echo_progress_start "Checking rTorrent Dependencies ... "
+depends_rtorrent
+echo_progress_done
+if [[ ! $rtorrentver == repo ]]; then
+    configure_curl
+    echo_progress_start "Building c-ares from source"
+    build_cares
+    echo_progress_done
+    echo_progress_start "Building curl from source"
+    build_curl
+    echo_progress_done
+    configure_rtorrent
+    echo_progress_start "Building xmlrpc-c from source ... "
+    build_xmlrpc-c
+    echo_progress_done
+    echo_progress_start "Building libtorrent from source ... "
+    build_libtorrent_rakshasa
+    echo_progress_done
+    echo_progress_start "Building rtorrent from source ... "
+    build_rtorrent
+    echo_progress_done
+else
+    echo_progress_start "Installing rtorrent with pacman ... "
+    rtorrent_apt
+    echo_progress_done
+fi
+
+if [[ -n $noexec ]]; then
+    mount -o remount,noexec /tmp
+fi
+
+for u in "${users[@]}"; do
+    if grep -q localhost /home/$u/.rtorrent.rc; then sed -i 's/localhost/127.0.0.1/g' /home/$u/.rtorrent.rc; fi
+    systemctl try-restart rtorrent@${u}
+done

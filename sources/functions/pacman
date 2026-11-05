@@ -1,0 +1,502 @@
+#!/bin/bash
+# Functions for streamlined script interfacing with pacman and paru (AUR) on Arch Linux
+# GPLv3 Applies
+
+# Define, in seconds, what is the max toleration for pacman sync db to be out of date
+export _max_pac_age=3600
+export _max_apt_age=3600
+
+# Log is required for checking for failures
+if [[ -z $log ]]; then export log="/root/logs/swizzin.log"; fi
+
+##############################################################################
+# INTERNAL FUNCTIONS
+##############################################################################
+
+_process_pac_args() {
+    _unset_pac_args
+    _pac_packages=()
+    while test $# -gt 0; do
+        case "$1" in
+            --only-upgrade)
+                _pac_only_upgrade="true"
+                echo_log_only "Pacman will only upgrade already installed packages"
+                ;;
+            --interactive)
+                _pac_interactive=true
+                echo_log_only "Pacman set to interactive"
+                ;;
+            --ignore-errors)
+                _pac_ignore_errors=true
+                echo_log_only "Pacman will ignore errors"
+                ;;
+            --skip-checks)
+                _pac_skip_checks=true
+                echo_log_only "Pacman will skip sanity checks"
+                ;;
+            --purge)
+                _pac_remove_purge=true
+                echo_log_only "Info: Pacman will purge package configs and unneeded deps (-Rns)"
+                ;;
+            --recommends)
+                _pac_install_recommends=true
+                echo_log_only "Pacman recommends flag noted"
+                ;;
+            --no-recommends)
+                _pac_install_recommends=false
+                echo_log_only "Info: Pacman no-recommends flag noted" >> "$log"
+                ;;
+            -*)
+                echo_error "Error: Invalid option: $1"
+                exit 1
+                ;;
+            *)
+                local _words=()
+                read -r -a _words <<< "$1"
+                _pac_packages+=("${_words[@]}")
+                ;;
+        esac
+        shift
+    done
+    _apt_packages=("${_pac_packages[@]}")
+    echo_log_only "New variables exported"
+}
+export -f _process_pac_args
+
+_process_apt_args() {
+    _process_pac_args "$@"
+}
+export -f _process_apt_args
+
+_unset_pac_args() {
+    unset _pac_only_upgrade
+    unset _pac_interactive
+    unset _pac_ignore_errors
+    unset _pac_skip_checks
+    unset _pac_remove_purge
+    unset _pac_install_recommends
+    unset _pac_packages
+    unset _apt_only_upgrade
+    unset _apt_interactive
+    unset _apt_ignore_errors
+    unset _apt_skip_checks
+    unset _apt_remove_purge
+    unset _apt_install_recommends
+    unset _apt_packages
+    echo_log_only "Variables unset"
+}
+export -f _unset_pac_args
+
+_unset_apt_args() {
+    _unset_pac_args
+}
+export -f _unset_apt_args
+
+_get_last_pac_log() {
+    tac "$log" | sed "/$_pac_logcheck_marker_text/q" | tac
+}
+export -f _get_last_pac_log
+
+_get_last_apt_log() {
+    _get_last_pac_log
+}
+export -f _get_last_apt_log
+
+_pac_logcheck_mark() {
+    if command -v uuidgen > /dev/null 2>&1; then
+        _pac_logcheck_marker_text=$(uuidgen)
+    else
+        _pac_logcheck_marker_text="swizzin-mark-$(date +%s)-$$"
+    fi
+    _apt_logcheck_marker_text="$_pac_logcheck_marker_text"
+    echo "$_pac_logcheck_marker_text" >> "$log"
+    echo_log_only "Inserted pacman logcheck marker"
+}
+export -f _pac_logcheck_mark
+
+_apt_logcheck_mark() {
+    _pac_logcheck_mark
+}
+export -f _apt_logcheck_mark
+
+_pac_logcheck() {
+    if _get_last_pac_log | grep -q '^error:'; then
+        echo_info "Dumping pacman log errors"
+        _get_last_pac_log | grep '^error:'
+        if [[ $_pac_ignore_errors != "true" ]]; then
+            echo_error "Pacman failed."
+            exit 1
+        else
+            echo_warn "Pacman failed. Please consult errors above and/or in the log."
+        fi
+    else
+        echo_log_only "No failures in pacman log found"
+    fi
+}
+export -f _pac_logcheck
+
+_apt_logcheck() {
+    _pac_logcheck
+}
+export -f _apt_logcheck
+
+_check_pacman_lock() {
+    if [[ $_pac_skip_checks != "true" ]]; then
+        if [[ -f /var/lib/pacman/db.lck ]]; then
+            if command -v fuser > /dev/null 2>&1 && fuser /var/lib/pacman/db.lck >> "$log" 2>&1; then
+                if [[ $_pac_ignore_errors != "true" ]]; then
+                    echo_error "pacman database is locked (/var/lib/pacman/db.lck). Please try again later"
+                    exit 1
+                else
+                    echo_warn "pacman database is locked (/var/lib/pacman/db.lck)."
+                fi
+            else
+                echo_warn "Stale pacman lockfile found at /var/lib/pacman/db.lck, removing..."
+                rm -f /var/lib/pacman/db.lck
+            fi
+        else
+            echo_log_only "No pacman locks found"
+        fi
+    fi
+}
+export -f _check_pacman_lock
+
+_check_dpkg_lock() {
+    _check_pacman_lock
+}
+export -f _check_dpkg_lock
+
+_pac_update() {
+    local last_update=0
+    if [[ -f /var/lib/pacman/sync/core.db ]]; then
+        last_update=$(stat -c %Y /var/lib/pacman/sync/core.db 2> /dev/null || echo 0)
+    fi
+    local now
+    now=$(date +%s)
+    echo_log_only "Pacman sync db age = $((now - last_update)), update is forced = $_update_is_forced"
+    if [ $((now - last_update)) -gt $_max_pac_age ] || [ "$_update_is_forced" = "true" ]; then
+        echo_progress_start "Synchronizing pacman package databases"
+        _check_pacman_lock
+        pacman -Sy --noconfirm >> "$log" 2>&1
+        _pac_logcheck
+        echo_progress_done
+    else
+        echo_log_only "Pacman database sufficiently up to date, skipping" >> "$log"
+    fi
+}
+export -f _pac_update
+
+_apt_update() {
+    _pac_update
+}
+export -f _apt_update
+
+##############################################################################
+# EXTERNAL FUNCTIONS
+##############################################################################
+
+# Compares two version strings using Arch's vercmp utility.
+# Usage: ver_compare <v1> <lt|le|eq|ne|ge|gt> <v2>
+ver_compare() {
+    local v1="$1"
+    local op="$2"
+    local v2="$3"
+    local cmp
+    cmp=$(vercmp "$v1" "$v2")
+    case "$op" in
+        lt) [[ "$cmp" -lt 0 ]] ;;
+        le) [[ "$cmp" -le 0 ]] ;;
+        eq) [[ "$cmp" -eq 0 ]] ;;
+        ne) [[ "$cmp" -ne 0 ]] ;;
+        ge) [[ "$cmp" -ge 0 ]] ;;
+        gt) [[ "$cmp" -gt 0 ]] ;;
+        *)
+            echo_error "ver_compare: unknown operator $op"
+            return 1
+            ;;
+    esac
+}
+export -f ver_compare
+
+# Ensures the dedicated unprivileged AUR user (_swizzin_aur) and paru AUR helper exist
+ensure_paru() {
+    if ! id -u _swizzin_aur > /dev/null 2>&1; then
+        useradd -r -m -d /var/lib/swizzin-aur -s /usr/bin/bash _swizzin_aur >> "$log" 2>&1
+    fi
+    mkdir -p /var/lib/swizzin-aur
+    chown -R _swizzin_aur:_swizzin_aur /var/lib/swizzin-aur
+    if [[ ! -f /etc/sudoers.d/swizzin-aur ]]; then
+        echo "_swizzin_aur ALL=(ALL) NOPASSWD: /usr/bin/pacman" > /etc/sudoers.d/swizzin-aur
+        chmod 0440 /etc/sudoers.d/swizzin-aur
+    fi
+
+    if ! command -v paru > /dev/null 2>&1; then
+        echo_progress_start "Bootstrapping paru AUR helper"
+        _check_pacman_lock
+        pacman -S --needed --noconfirm base-devel git >> "$log" 2>&1
+        local build_dir="/tmp/paru-build"
+        rm -rf "$build_dir"
+        mkdir -p "$build_dir"
+        chown -R _swizzin_aur:_swizzin_aur "$build_dir"
+        if ! sudo -u _swizzin_aur -H bash -c "git clone https://aur.archlinux.org/paru-bin.git '$build_dir/paru' && cd '$build_dir/paru' && makepkg -si --noconfirm" >> "$log" 2>&1; then
+            rm -rf "$build_dir/paru"
+            sudo -u _swizzin_aur -H bash -c "git clone https://aur.archlinux.org/paru.git '$build_dir/paru' && cd '$build_dir/paru' && makepkg -si --noconfirm" >> "$log" 2>&1 || {
+                echo_error "Failed to build and install paru"
+                rm -rf "$build_dir"
+                exit 1
+            }
+        fi
+        rm -rf "$build_dir"
+        echo_progress_done "paru installed"
+    fi
+}
+export -f ensure_paru
+
+# Installs packages via paru using the dedicated _swizzin_aur build user
+aur_install() {
+    _pac_logcheck_mark
+    _process_pac_args "$@"
+    local aur_uninstalled=()
+    for package in "${_pac_packages[@]}"; do
+        if [[ $_pac_only_upgrade == "true" ]] || ! check_installed "$package"; then
+            aur_uninstalled+=("$package")
+        fi
+    done
+    if [[ ${#aur_uninstalled[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    _check_pacman_lock
+    ensure_paru
+
+    echo_progress_start "Installing ${#aur_uninstalled[@]} packages via paru\n(${aur_uninstalled[*]})"
+    if [[ $_pac_interactive == "true" ]]; then
+        sudo -u _swizzin_aur -H paru -S --needed "${aur_uninstalled[@]}" | tee -a "$log"
+    else
+        if ! sudo -u _swizzin_aur -H paru -S --needed --noconfirm --skipreview --cleanafter "${aur_uninstalled[@]}" >> "$log" 2>&1; then
+            if [[ $_pac_ignore_errors != "true" ]]; then
+                echo_error "paru failed to install: ${aur_uninstalled[*]}"
+                exit 1
+            else
+                echo_warn "paru failed to install: ${aur_uninstalled[*]}"
+            fi
+        fi
+    fi
+    echo_progress_done "paru install complete"
+}
+export -f aur_install
+
+# Checks if a package or package group is installed via pacman
+check_installed() {
+    if pacman -Qi "$1" > /dev/null 2>&1 || pacman -Qg "$1" > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+export -f check_installed
+
+# Returns the version of the candidate package to install
+get_candidate_version() {
+    local package="$1"
+    local ver
+    ver=$(LC_ALL=C pacman -Si "$package" 2> /dev/null | awk '/^Version/{print $3; exit}')
+    if [[ -z "$ver" ]] && command -v paru > /dev/null 2>&1; then
+        ver=$(LC_ALL=C paru -Si "$package" 2> /dev/null | awk '/^Version/{print $3; exit}')
+    fi
+    ver="${ver#*:}"
+    ver="${ver%%-*}"
+    ver="${ver%%+*}"
+    echo "$ver"
+}
+export -f get_candidate_version
+
+# Synchronizes pacman package databases
+pac_update() {
+    _pac_logcheck_mark
+    _process_pac_args "$@"
+    _update_is_forced="true"
+    _pac_update
+    _update_is_forced=""
+}
+export -f pac_update
+
+apt_update() {
+    pac_update "$@"
+}
+export -f apt_update
+
+# Performs a full system upgrade via pacman (and paru if installed)
+pac_upgrade() {
+    _pac_logcheck_mark
+    _process_pac_args "$@"
+    _check_pacman_lock
+    _pac_update
+
+    local upgradable
+    upgradable=$(pacman -Qu 2> /dev/null | wc -l)
+    if [[ $upgradable -gt 0 ]]; then
+        echo_progress_start "Performing pacman upgrade\n$upgradable packages to upgrade."
+        if [[ $_pac_interactive == "true" ]]; then
+            pacman -Su | tee -a "$log"
+        else
+            pacman -Su --noconfirm >> "$log" 2>&1
+        fi
+        _pac_logcheck
+        echo_progress_done "Pacman upgrade complete"
+    else
+        echo_log_only "$upgradable packages to upgrade."
+    fi
+}
+export -f pac_upgrade
+
+apt_upgrade() {
+    pac_upgrade "$@"
+}
+export -f apt_upgrade
+
+# Installs a list of packages using pacman for official repo packages and paru for AUR packages
+pac_install() {
+    _pac_logcheck_mark
+    _process_pac_args "$@"
+
+    local pac_uninstalled=()
+    for package in "${_pac_packages[@]}"; do
+        if [[ $_pac_only_upgrade == "true" ]]; then
+            if check_installed "$package"; then
+                pac_uninstalled+=("$package")
+            fi
+        else
+            if ! check_installed "$package"; then
+                pac_uninstalled+=("$package")
+            fi
+        fi
+    done
+
+    if [[ ${#pac_uninstalled[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    _check_pacman_lock
+    _pac_update
+
+    local repo_pkgs=()
+    local aur_pkgs=()
+    for package in "${pac_uninstalled[@]}"; do
+        if pacman -Si "$package" > /dev/null 2>&1 || pacman -Sg "$package" > /dev/null 2>&1; then
+            repo_pkgs+=("$package")
+        else
+            aur_pkgs+=("$package")
+        fi
+    done
+
+    local action_msg="installation"
+    if [[ $_pac_only_upgrade == "true" ]]; then
+        action_msg="upgrade"
+    fi
+
+    if [[ ${#repo_pkgs[@]} -gt 0 ]]; then
+        echo_progress_start "Performing $action_msg of ${#repo_pkgs[@]} packages via pacman\n(${repo_pkgs[*]})"
+        if [[ $_pac_interactive == "true" ]]; then
+            pacman -S --needed "${repo_pkgs[@]}" | tee -a "$log"
+        else
+            for pekkidge in "${repo_pkgs[@]}"; do
+                pacman -S --needed --noconfirm "$pekkidge" >> "$log" 2>&1
+            done
+        fi
+        _pac_logcheck
+        echo_progress_done "Pacman install complete"
+    fi
+
+    if [[ ${#aur_pkgs[@]} -gt 0 ]]; then
+        local aur_flags=()
+        [[ $_pac_interactive == "true" ]] && aur_flags+=("--interactive")
+        [[ $_pac_ignore_errors == "true" ]] && aur_flags+=("--ignore-errors")
+        [[ $_pac_skip_checks == "true" ]] && aur_flags+=("--skip-checks")
+        [[ $_pac_only_upgrade == "true" ]] && aur_flags+=("--only-upgrade")
+        aur_install "${aur_flags[@]}" "${aur_pkgs[@]}"
+    fi
+}
+export -f pac_install
+
+apt_install() {
+    pac_install "$@"
+}
+export -f apt_install
+
+# Removes a list of packages using pacman
+pac_remove() {
+    _pac_logcheck_mark
+    _process_pac_args "$@"
+    _check_pacman_lock
+
+    local to_remove=()
+    for pattern in "${_pac_packages[@]}"; do
+        if [[ "$pattern" =~ [\^\*\.\[\$] ]]; then
+            local matched=()
+            readarray -t matched < <(pacman -Qq 2> /dev/null | grep -E "$pattern" || true)
+            for m in "${matched[@]}"; do
+                [[ -n "$m" ]] && to_remove+=("$m")
+            done
+        elif check_installed "$pattern"; then
+            to_remove+=("$pattern")
+        fi
+    done
+
+    if [[ ${#to_remove[@]} -eq 0 ]]; then
+        echo_log_only "No matching installed packages to remove for: ${_pac_packages[*]}"
+        return 0
+    fi
+
+    echo_progress_start "Removing ${#to_remove[@]} packages\n(${to_remove[*]})"
+
+    local flags="-R"
+    if [[ $_pac_remove_purge == "true" ]]; then
+        flags="-Rns"
+        echo_log_only "Purging packages and unneeded dependencies (-Rns)"
+    fi
+
+    if [[ $_pac_interactive == "true" ]]; then
+        pacman $flags "${to_remove[@]}" | tee -a "$log"
+    else
+        if ! pacman $flags --noconfirm "${to_remove[@]}" >> "$log" 2>&1; then
+            for pekkidge in "${to_remove[@]}"; do
+                pacman -Rdd --noconfirm "$pekkidge" >> "$log" 2>&1 || true
+            done
+        fi
+    fi
+    _pac_logcheck
+    echo_progress_done "Package removal complete"
+}
+export -f pac_remove
+
+apt_remove() {
+    pac_remove "$@"
+}
+export -f apt_remove
+
+# Removes orphaned packages using pacman
+pac_autoremove() {
+    _pac_logcheck_mark
+    _process_pac_args "$@"
+    _check_pacman_lock
+
+    echo_progress_start "Cleaning up orphaned packages"
+    local orphans=()
+    readarray -t orphans < <(pacman -Qdtq 2> /dev/null || true)
+    if [[ ${#orphans[@]} -gt 0 && -n "${orphans[0]}" ]]; then
+        if [[ $_pac_interactive == "true" ]]; then
+            pacman -Rns "${orphans[@]}" | tee -a "$log"
+        else
+            pacman -Rns --noconfirm "${orphans[@]}" >> "$log" 2>&1 || true
+        fi
+    fi
+    _pac_logcheck
+    echo_progress_done "Orphan cleanup complete"
+}
+export -f pac_autoremove
+
+apt_autoremove() {
+    pac_autoremove "$@"
+}
+export -f apt_autoremove

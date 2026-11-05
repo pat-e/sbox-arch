@@ -1,0 +1,570 @@
+#!/bin/bash
+
+function whiptail_qbittorrent() {
+    if [[ -z $QBITTORRENT_VERSION ]]; then
+        . /etc/swizzin/sources/functions/apt
+        codename=$(_os_codename)
+        releases=$(git ls-remote -t --refs https://github.com/qbittorrent/qBittorrent.git | awk '{sub("refs/tags/release-", ""); print $2 }' | grep -v -e "beta" -e "rc" | sort -Vr)
+
+        latestv41=$(echo "$releases" | grep -m1 -oP '^4\.1\.\d?.?\d')
+        latestv42=$(echo "$releases" | grep -m1 -oP '^4\.2\.\d?.?\d')
+        latestv43=$(echo "$releases" | grep -m1 -oP '^4\.3\.\d?.?\d')
+        latestv44=$(echo "$releases" | grep -m1 -oP '^4\.4\.\d?.?\d')
+        latestv45=$(echo "$releases" | grep -m1 -oP '^4\.5\.\d?.?\d')
+        latestv46=$(echo "$releases" | grep -m1 -oP '^4\.6\.\d?.?\d')
+        latestv50=$(echo "$releases" | grep -m1 -oP '^5\.0\.\d?.?\d')
+        latestv51=$(echo "$releases" | grep -m1 -oP '^5\.1\.\d?.?\d')
+        #latestv=$(echo "$releases" | grep -m1 -oP '\d.\d?.?\d?.?\d')
+        repov=$(get_candidate_version qbittorrent-nox)
+        case ${codename} in
+            "buster")
+                #We can't go past 4.5 due to gcc8 missing features
+                function=$(whiptail --title "Pick qbittorrent version" --menu "Choose a qBittorrent version:" --ok-button "Continue" --nocancel 12 50 6 \
+                    "Repo" "${repov}" \
+                    "4.4" "(${latestv44})" \
+                    "4.3" "(${latestv43})" \
+                    "4.2" "(${latestv42})" \
+                    "4.1" "(${latestv41})" 3>&1 1>&2 2>&3)
+                ;;
+            "bullseye" | "focal" | "jammy")
+                function=$(whiptail --title "Pick qbittorrent version" --menu "Choose a qBittorrent version:" --ok-button "Continue" --nocancel 12 50 6 \
+                    "Repo" "${repov}" \
+                    "4.6" "(${latestv46})" \
+                    "4.5" "(${latestv45})" \
+                    "4.4" "(${latestv44})" \
+                    "4.3" "(${latestv43})" \
+                    "4.2" "(${latestv42})" \
+                    "4.1" "(${latestv41})" 3>&1 1>&2 2>&3)
+                #"Latest" "(${latestv})" 3>&1 1>&2 2>&3)
+                ;;
+            *)
+                function=$(
+                    whiptail --title "Pick qbittorrent version" --menu "Choose a qBittorrent version:" --ok-button "Continue" --nocancel 12 50 6 \
+                        "Repo" "${repov}" \
+                        "5.1" "(${latestv51})" \
+                        "5.0" "(${latestv50})" \
+                        "4.6" "(${latestv46})" \
+                        "4.5" "(${latestv45})" \
+                        "4.4" "(${latestv44})" \
+                        "4.3" "(${latestv43})" 3>&1 1>&2 2>&3
+                )
+                ;;
+        esac
+        case $function in
+            #Latest)
+            #export QBITTORRENT_VERSION=${latestv}
+            #;;
+            4.1)
+                export QBITTORRENT_VERSION=${latestv41}
+                ;;
+            4.2)
+                export QBITTORRENT_VERSION=${latestv42}
+                ;;
+            4.3)
+                export QBITTORRENT_VERSION=${latestv43}
+                ;;
+            4.3.1)
+                export QBITTORRENT_VERSION=4.3.1
+                ;;
+            4.4)
+                export QBITTORRENT_VERSION=${latestv44}
+                ;;
+            4.5)
+                export QBITTORRENT_VERSION=${latestv45}
+                ;;
+            4.6)
+                export QBITTORRENT_VERSION=${latestv46}
+                ;;
+            5.0)
+                export QBITTORRENT_VERSION=${latestv50}
+                ;;
+            5.1)
+                export QBITTORRENT_VERSION=${latestv51}
+                ;;
+            Repo)
+                export QBITTORRENT_VERSION=repo
+                ;;
+            *)
+                echo_error "Function not supported"
+                exit 1
+                ;;
+        esac
+    fi
+}
+
+function qbittorrent_version_info() {
+    if [[ ${QBITTORRENT_VERSION} == "latest" ]]; then
+        case $(_os_codename) in
+            *)
+                QBITTORRENT_VERSION=$(git ls-remote -t --refs https://github.com/qbittorrent/qBittorrent.git | awk '{sub("refs/tags/release-", ""); print $2 }' | grep -v -e "beta" -e "rc" | sort -Vr | head -n1)
+                #latestv44=$(echo "$releases" | grep -m1 -oP '4\.4\.\d?.?\d')
+                ;;
+        esac
+    fi
+    CFLAGS="-O3 -march=native"
+    CXXFLAGS="-O3 -march=native"
+    case $QBITTORRENT_VERSION in
+        4.1.*)
+            libtorrent_branch=RC_1_1
+            libtorrent_minimum_version=1.1.0
+            libtorrent_maximum_version=1.1.14
+            stdcver="c++14"
+            qt_minimum_version=5.5
+            cryptography_type=built-in
+            build_type=autotools
+            ;;
+        4.2.*)
+            libtorrent_branch=RC_1_2
+            libtorrent_minimum_version=1.2.0
+            stdcver="c++14"
+            qt_minimum_version=5.9
+            cryptography_type=openssl
+            build_type=autotools
+            ;;
+        4.3.[012]*)
+            libtorrent_branch=RC_1_2
+            libtorrent_minimum_version=1.2.11
+            stdcver="c++14"
+            qt_minimum_version=5.9
+            cryptography_type=openssl
+            build_type=autotools
+            ;;
+        4.3.3)
+            libtorrent_branch=RC_1_2
+            libtorrent_minimum_version=1.2.11
+            stdcver="c++17"
+            qt_minimum_version=5.9
+            cryptography_type=openssl
+            build_type=autotools
+            ;;
+        4.3.*)
+            libtorrent_branch=RC_1_2
+            libtorrent_minimum_version=1.2.12
+            stdcver="c++17"
+            qt_minimum_version=5.12
+            cryptography_type=openssl
+            build_type=autotools
+            ;;
+        4.4.*)
+            if [[ -n ${LIBTORRENT_VERSION} ]]; then
+                case $LIBTORRENT_VERSION in
+                    RC_2_0)
+                        libtorrent_branch=RC_2_0
+                        ;;
+                    RC_1_2)
+                        libtorrent_branch=RC_1_2
+                        ;;
+                    *)
+                        echo_error "LIBTORRENT_VERSION must be either RC_1_2 or RC_2_0. You entered ${LIBTORRENT_VERSION}."
+                        exit 1
+                        ;;
+                esac
+                echo_info "Overriding libtorrent version with ${LIBTORRENT_VERSION}"
+            else
+                libtorrent_branch=RC_1_2
+            fi
+            libtorrent_minimum_version=1.2.14
+            stdcver="c++17"
+            qt_minimum_version=6.0
+            qbt_use_qt6=ON
+            cryptography_type=openssl
+            build_type=cmake
+            ;;
+        4.5.*)
+            if [[ -n ${LIBTORRENT_VERSION} ]]; then
+                case $LIBTORRENT_VERSION in
+                    RC_2_0)
+                        libtorrent_branch=RC_2_0
+                        ;;
+                    RC_1_2)
+                        libtorrent_branch=RC_1_2
+                        ;;
+                    *)
+                        echo_error "LIBTORRENT_VERSION must be either RC_1_2 or RC_2_0. You entered ${LIBTORRENT_VERSION}."
+                        exit 1
+                        ;;
+                esac
+                echo_info "Overriding libtorrent version with ${LIBTORRENT_VERSION}"
+            else
+                libtorrent_branch=RC_1_2
+            fi
+            libtorrent_minimum_version=1.2.18
+            stdcver="c++17"
+            qt_minimum_version=6.2
+            qbt_use_qt6=ON
+            cryptography_type=openssl
+            build_type=cmake
+            ;;
+        4.6.*)
+            if [[ -n ${LIBTORRENT_VERSION} ]]; then
+                case $LIBTORRENT_VERSION in
+                    RC_2_0)
+                        libtorrent_branch=RC_2_0
+                        ;;
+                    RC_1_2)
+                        libtorrent_branch=RC_1_2
+                        ;;
+                    *)
+                        echo_error "LIBTORRENT_VERSION must be either RC_1_2 or RC_2_0. You entered ${LIBTORRENT_VERSION}."
+                        exit 1
+                        ;;
+                esac
+                echo_info "Overriding libtorrent version with ${LIBTORRENT_VERSION}"
+            else
+                libtorrent_branch=RC_1_2
+            fi
+            libtorrent_minimum_version=1.2.19
+            stdcver="c++17"
+            qt_minimum_version=6.4
+            qbt_use_qt6=ON
+            cryptography_type=openssl
+            build_type=cmake
+            ;;
+        5.0.*)
+            if [[ -n ${LIBTORRENT_VERSION} ]]; then
+                case $LIBTORRENT_VERSION in
+                    RC_2_0)
+                        libtorrent_branch=RC_2_0
+                        ;;
+                    RC_1_2)
+                        libtorrent_branch=RC_1_2
+                        ;;
+                    *)
+                        echo_error "LIBTORRENT_VERSION must be either RC_1_2 or RC_2_0. You entered ${LIBTORRENT_VERSION}."
+                        exit 1
+                        ;;
+                esac
+                echo_info "Overriding libtorrent version with ${LIBTORRENT_VERSION}"
+            else
+                libtorrent_branch=RC_1_2
+            fi
+            libtorrent_minimum_version=1.2.19
+            stdcver="c++20"
+            qt_minimum_version=6.5
+            qbt_use_qt6=ON
+            cryptography_type=openssl
+            build_type=cmake
+            ;;
+        5.1.*)
+            if [[ -n ${LIBTORRENT_VERSION} ]]; then
+                case $LIBTORRENT_VERSION in
+                    RC_2_0)
+                        libtorrent_branch=RC_2_0
+                        ;;
+                    RC_1_2)
+                        libtorrent_branch=RC_1_2
+                        ;;
+                    *)
+                        echo_error "LIBTORRENT_VERSION must be either RC_1_2 or RC_2_0. You entered ${LIBTORRENT_VERSION}."
+                        exit 1
+                        ;;
+                esac
+                echo_info "Overriding libtorrent version with ${LIBTORRENT_VERSION}"
+            else
+                libtorrent_branch=RC_1_2
+            fi
+            libtorrent_minimum_version=1.2.20
+            stdcver="c++20"
+            qt_minimum_version=6.5
+            qbt_use_qt6=ON
+            cryptography_type=openssl
+            build_type=cmake
+            ;;
+        *)
+            echo_error "qBittorrent version should be between 4.1.*(.*) and 5.1.*(.*) -- Setup will not proceed."
+            exit 1
+            ;;
+    esac
+}
+
+function skip_libtorrent_qbittorrent() {
+    if [[ -f /usr/local/lib/libtorrent-rasterbar.a ]]; then
+        libtorrent_current_version=$(strings /usr/local/lib/libtorrent-rasterbar.a | grep -m1 -P 'libtorrent/\d+\.\d+\.\d+\.\d+' | cut -d/ -f2)
+        if [[ -n $libtorrent_maximum_version ]]; then
+            if ver_compare ${libtorrent_current_version} ge ${libtorrent_minimum_version} && ver_compare ${libtorrent_current_version} le ${libtorrent_maximum_version}; then
+                if whiptail_skip_libtorrent_rasterbar; then
+                    return
+                fi
+            fi
+        else
+            if ver_compare ${libtorrent_current_version} ge ${libtorrent_minimum_version}; then
+                if whiptail_skip_libtorrent_rasterbar; then
+                    return
+                fi
+            fi
+        fi
+    fi
+    false
+    return
+}
+
+function install_qt() {
+    if [[ -z ${qbt_use_qt6} ]]; then
+        LIST='qt5-base qt5-tools'
+    else
+        LIST='qt6-base qt6-tools'
+    fi
+    pac_install $LIST
+    QT_METHOD=repo
+}
+
+function whiptail_skip_qt() {
+    if (whiptail --title "Skip QT Compile?" --yesno "Setup has determined that you can save some time by skipping the compilation of QT dependencies as they are already sufficient but out of date. Do you want to?" 12 50); then
+        true
+    else
+        false
+    fi
+}
+
+function build_libtorrent_qbittorrent() {
+    rm_if_exists /tmp/libtorrent
+    booststrap
+    pac_install openssl
+
+    export "${libtorrent_branch}"
+    libtorrent_clone
+
+    cd /tmp/libtorrent
+    if [[ -f /root/libtorrent-${libtorrent_branch}.patch ]]; then
+        patch -p1 < /root/libtorrent-${libtorrent_branch}.patch >> ${log} 2>&1 || {
+            echo _error "Something went wrong when patching libtorrent"
+            exit 1
+        }
+        echo_info "Libtorrent patch found and applied!"
+    else
+        echo_log_only "No libtorrent patch found at /root/libtorrent-${libtorrent_branch}.patch"
+    fi
+    if [[ ${libtorrent_branch} == "RC_1_1" ]]; then
+        #Dirty hack to ensure finished library uses `libtorrent-rasterbar` for its name in the deprecated 1.1 branch
+        sed -i 's/virtual-target.add-prefix-and-suffix $(name)/virtual-target.add-prefix-and-suffix $(name)-rasterbar/g' Jamfile
+    fi
+    VERSION=$(grep -oP "VERSION\ = \K\d\.\d\.\d+" Jamfile)
+    case $build_type in
+        cmake)
+            pac_install cmake ninja
+
+            PATH=/opt/local/bin:${PATH} cmake -Wno-dev -Wno-deprecated -G Ninja -B build \
+                -D CMAKE_BUILD_TYPE="Release" \
+                -D CMAKE_CXX_STANDARD="${stdcver//[^0-9]/}" \
+                -D BOOST_INCLUDEDIR="/opt/boost_${BOOST_VERSION}" \
+                -D BUILD_SHARED_LIBS=OFF \
+                -D CMAKE_CXX_FLAGS="${CXXFLAGS}" \
+                -D CMAKE_C_FLAGS="${CFLAGS}" \
+                -D CMAKE_INSTALL_PREFIX="/usr/local" >> ${log} 2>&1 || {
+                echo_error "The cmake build of libtorrent did not complete successfully"
+                exit 1
+            }
+            PATH=/opt/local/bin:${PATH} cmake --build build >> ${log} 2>&1 || {
+                echo_error "The cmake build of libtorrent did not complete successfully"
+                exit 1
+            }
+            PATH=/opt/local/bin:${PATH} cmake --install build >> ${log} 2>&1 || {
+                echo_error "The cmake install of libtorrent did not complete successfully"
+                exit 1
+            }
+            #Fix pkgconfig paths/quirks
+            sed -i 's|-ltorrent-rasterbar|-l:libtorrent-rasterbar.a|g' /usr/local/lib/pkgconfig/libtorrent-rasterbar.pc
+            ;;
+        autotools)
+            echo "using gcc : : : <cflags>\"-O3 -march=native -std=${stdcver}\" <cxxflags>\"-O3 -march=native -std=${stdcver}\" ;" > /root/user-config.jam
+            /opt/boost_${BOOST_VERSION}/b2 -j$(nproc) crypto=${cryptography_type} variant=release link=static install --prefix=/usr/local install >> ${log} 2>&1 || {
+                echo_error "The boost build of libtorrent did not complete successfully"
+                exit 1
+            }
+            ;;
+        *)
+            echo_error "Build type must be cmake or autotools"
+            exit 1
+            ;;
+    esac
+    cd /tmp
+    rm_if_exists /tmp/libtorrent
+    rm_if_exists /tmp/dist
+}
+
+function build_qbittorrent() {
+    noexec=$(grep "/tmp" /etc/fstab | grep noexec)
+    if [[ -n $noexec ]]; then
+        mount -o remount,exec /tmp
+        noexec=1
+    fi
+    VERSION=${QBITTORRENT_VERSION}
+    LIST='base-devel automake pkgconf libtool git zlib openssl geoip python icu double-conversion md4c'
+    pac_install $LIST
+    install_qt
+    rm_if_exists "/tmp/qbittorrent"
+    wget -O /tmp/release-${VERSION}.tar.gz https://github.com/qbittorrent/qBittorrent/archive/release-${VERSION}.tar.gz >> "${log}" 2>&1 || {
+        echo_error "qBittorrent could not be downloaded. Setup will not proceed"
+        exit 1
+    }
+    mkdir -p /tmp/qbittorrent
+    tar -xvf /tmp/release-${VERSION}.tar.gz -C /tmp/qbittorrent --strip-components=1 >> $log 2>&1
+    rm -rf /tmp/release-${VERSION}.tar.gz
+
+    cd /tmp/qbittorrent
+    tag=" static with ${stdcver} O3 march=native"
+    #Ensure boost variables are loaded (i.e. libtorrent skipped)
+    if [[ $VERSION = "4.6.7" ]]; then
+        echo_info "Applying security patch for qBittorrent 4.6.7"
+        curl -s https://github.com/qbittorrent/qBittorrent/commit/91943e4815ae40a273b39432340357a4ce879f3b.patch | git apply -v >> $log 2>&1
+    fi
+    booststrap
+    case $build_type in
+        cmake)
+            PATH=/opt/local/bin:${PATH} cmake -Wno-dev -Wno-deprecated -G Ninja -B build \
+                -D CMAKE_BUILD_TYPE="release" \
+                -D CMAKE_CXX_STANDARD="${stdcver//[^0-9]/}" \
+                -D QT6="${qbt_use_qt6:=OFF}" \
+                -D Boost_NO_BOOST_CMAKE=TRUE \
+                -D CMAKE_CXX_FLAGS="${CXXFLAGS}" \
+                -D CMAKE_C_FLAGS="${CFLAGS}" \
+                -D GUI=OFF \
+                -D CMAKE_INSTALL_PREFIX="/tmp/dist/qbittorrent/usr" >> ${log} 2>&1 || {
+                echo_error "The cmake build of qbittorrent did not complete successfully"
+                exit 1
+            }
+            PATH=/opt/local/bin:${PATH} cmake --build build >> ${log} 2>&1 || {
+                echo_error "The cmake build of qbittorrent did not complete successfully"
+                exit 1
+            }
+            PATH=/opt/local/bin:${PATH} cmake --install build >> ${log} 2>&1 || {
+                echo_error "The cmake install of qbittorrent did not complete successfully"
+                exit 1
+            }
+            ;;
+        autotools)
+            ./configure --prefix=/usr --disable-gui --with-boost=${BOOST_ROOT} --with-boost-libdir="/usr/local/lib" libtorrent_CFLAGS="-I/usr/local/include -I${BOOST_ROOT}" libtorrent_LIBS="-L/usr/local/lib -l:libtorrent-rasterbar.a -lssl -lcrypto" CXXFLAGS="-O3 -march=native -std=${stdcver}" ${QT_SWIZZIN} >> ${log} 2>&1 || {
+                echo_error "The configure of qbittorrent did not complete successfully"
+                exit 1
+            }
+            make -j$(nproc) >> $log 2>&1 || {
+                echo_error "The make of qbittorrent did not complete successfully"
+                exit 1
+            }
+            make INSTALL_ROOT=/tmp/dist/qbittorrent install >> ${log} 2>&1 || {
+                echo_error "The make install of qbittorrent did not complete successfully"
+                exit 1
+            }
+            ;;
+        *)
+            echo_error "Build type must be cmake or autotools"
+            exit 1
+            ;;
+    esac
+    if [[ ! -f /tmp/dist/qbittorrent/usr/bin/qbittorrent-nox ]]; then
+        echo_error "Compile did not produce a qbittorrent-nox binary. Something went wrong"
+        exit 1
+    fi
+    #install qbt-cli
+    qbt_cli_version=$(github_latest_version ludviglundgren/qbittorrent-cli)
+    cd /tmp/dist/qbittorrent/usr/bin
+    wget -O qbtcli.tar.gz https://github.com/ludviglundgren/qbittorrent-cli/releases/download/${qbt_cli_version}/qbittorrent-cli_${qbt_cli_version//v/}_linux_$(_os_arch).tar.gz >> ${log} 2>&1
+    tar xvf qbtcli.tar.gz >> ${log} 2>&1
+    rm -f qbtcli.tar.gz README.md >> ${log} 2>&1
+    cp -a /tmp/dist/qbittorrent/usr/* /usr/ >> ${log} 2>&1 || {
+        echo_error "qBittorrent could not be installed. Setup will not proceed"
+        exit 1
+    }
+    cd /tmp
+    rm_if_exists /tmp/qbittorrent
+    rm_if_exists /tmp/dist
+    if [[ -n $noexec ]]; then
+        mount -o remount,noexec /tmp
+    fi
+}
+
+function qbittorrent_service() {
+    if [[ ! -f /etc/systemd/system/qbittorent@.service ]]; then
+        type=simple
+        if [[ $(systemctl --version | awk 'NR==1 {print $2}') -ge 240 ]]; then
+            type=exec
+        fi
+        cat > /etc/systemd/system/qbittorrent@.service << EOQBS
+[Unit]
+Description=qBittorrent-nox service for %i
+Documentation=man:qbittorrent-nox(1)
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+
+[Service]
+Type=$type
+User=%i
+Group=%i
+ExecStart=/usr/bin/qbittorrent-nox
+
+[Install]
+WantedBy=multi-user.target
+EOQBS
+    fi
+}
+
+function qbittorrent_user_config() {
+    user=$1
+    local_packages=/usr/local/bin/swizzin
+    qbtv=$(qbittorrent-nox --version | grep -oP '\d+\.\d+\.\d+')
+    password=$(_get_user_password ${user})
+    if ver_compare ${qbtv} lt 4.2.0; then
+        hashed=$(echo -n "$password" | md5sum | awk '{print $1}')
+        QBTWP="WebUI\Password_ha1=@ByteArray($hashed)"
+    else
+        hashed=$(python3 ${local_packages}/qbittorrent.Userpass.py ${password})
+        QBTWP="WebUI\Password_PBKDF2=\"@ByteArray($hashed)\""
+    fi
+
+    usermod -a -G ${user} http 2>> $log
+    port=$(port 10000 11000)
+    mkdir -p /home/${user}/.config/qBittorrent/
+    mkdir -p /home/${user}/torrents/qbittorrent
+    chown ${user}: /home/${user}/torrents
+    chown ${user}: /home/${user}/torrents/qbittorrent
+    chown $user: /home/${user}/.config
+    chown $user: /home/${user}/.config/qBittorrent
+    cat > /home/${user}/.config/qBittorrent/qBittorrent.conf << QBTCONF
+[BitTorrent]
+Session\DisableAutoTMMByDefault=false
+
+[Preferences]
+Bittorrent\MaxConnecs=-1
+Bittorrent\MaxConnecsPerTorrent=-1
+Bittorrent\MaxUploads=-1
+Bittorrent\MaxUploadsPerTorrent=-1
+Downloads\PreAllocation=true
+Downloads\SavePath=/home/${user}/torrents/qbittorrent/
+Queueing\QueueingEnabled=false
+WebUI\Address=*
+WebUI\AlternativeUIEnabled=false
+WebUI\BanDuration=3600
+WebUI\CSRFProtection=true
+WebUI\ClickjackingProtection=true
+WebUI\LocalHostAuth=true
+WebUI\MaxAuthenticationFailCount=5
+${QBTWP}
+WebUI\Port=${port}
+WebUI\RootFolder=
+WebUI\SecureCookie=true
+WebUI\ServerDomains=*
+WebUI\SessionTimeout=3600
+WebUI\UseUPnP=true
+WebUI\Username=${user}
+QBTCONF
+}
+
+function qbittorrent_chpasswd() {
+    user=$1
+    password=$2
+    local_packages=/usr/local/bin/swizzin
+    qbtv=$(qbittorrent-nox --version 2> /dev/null | grep -oP '\d+\.\d+\.\d+' || echo '0.0.0.0')
+    active=$(systemctl is-active qbittorrent@${user})
+    if ver_compare ${qbtv} lt 4.2.0; then
+        hashed=$(echo -n "$password" | md5sum | awk '{print $1}')
+        QBTWP="WebUI\\\Password_ha1=@ByteArray($hashed)"
+    else
+        hashed=$(python3 ${local_packages}/qbittorrent.Userpass.py ${password})
+        QBTWP="WebUI\\\Password_PBKDF2=\"@ByteArray($hashed)\""
+    fi
+    systemctl stop qbittorrent@${user}
+    sed -i "s|WebUI\\\Password.*|$QBTWP|g" /home/${user}/.config/qBittorrent/qBittorrent.conf
+    if [[ $active == "active" ]]; then
+        systemctl start qbittorrent@${user}
+    fi
+}

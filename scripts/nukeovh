@@ -1,0 +1,17 @@
+#!/bin/bash
+
+grsec=$(uname -a | grep -i grs)
+if [[ -n $grsec ]]; then
+    echo_info "Your server is currently running with kernel version: $(uname -r)\nWhile it is not required to switch, kernels with grsec are not recommend due to conflicts in the panel and other packages."
+    if ask "Would you like swizzin to install the distribution kernel?" Y; then
+        pac_install linux linux-headers
+        if [[ -f /etc/grub.d/06_OVHkernel ]]; then
+            mv /etc/grub.d/06_OVHkernel /etc/grub.d/25_OVHkernel
+        fi
+        grub-mkconfig -o /boot/grub/grub.cfg >> "${log}" 2>&1
+    else
+        echo_warn "No changes to kernel will be performed"
+    fi
+else
+    echo_info "No need to swap kernel"
+fi

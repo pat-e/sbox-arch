@@ -1,0 +1,23 @@
+#!/bin/bash
+#npm related functions
+
+function npm_install() {
+    if [[ ! $(command -v npm) ]] || [[ ! $(command -v node) ]]; then
+        echo_progress_start "Installing nodejs and npm"
+        pac_install nodejs npm base-devel
+        echo_progress_done "Npm installed"
+    else
+        npm_update
+    fi
+}
+
+function npm_update() {
+    pac_install --only-upgrade nodejs npm
+}
+
+function yarn_install() {
+    npm_install
+    echo_progress_start "Installing yarn"
+    pac_install yarn
+    echo_progress_done "Yarn installed"
+}

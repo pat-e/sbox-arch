@@ -1,0 +1,4 @@
+#!/bin/bash
+install_java8() {
+    pac_install jre8-openjdk
+}

@@ -1,0 +1,14 @@
+#!/bin/bash
+# Arch Linux is rolling release; backport helpers are no-ops for compatibility
+
+function check_debian_backports() {
+    :
+}
+
+set_packages_to_backports() {
+    :
+}
+
+function check_ubuntu_updates() {
+    :
+}

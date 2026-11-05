@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Restarts php-fpm service on Arch Linux
+function restart_php_fpm() {
+    serv="php-fpm.service"
+    echo_log_only "Restarting $serv"
+    systemctl restart $serv >> $log 2>&1
+}
+
+function reload_php_fpm() {
+    serv="php-fpm.service"
+    echo_log_only "Reloading $serv"
+    systemctl reload $serv >> $log 2>&1
+}
+
+function reload_php_opcache() {
+    echo_log_only "Reloading OPcache"
+    /usr/local/bin/swizzin/php-fpm-cli -r 'opcache_reset() ?>'
+}
+
+# Returns the installed PHP major.minor version on Arch Linux (e.g. '8.3')
+function php_v_from_nginxconf() {
+    php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;' 2> /dev/null || echo ""
+}
+
+# Returns empty string on Arch Linux because php-fpm service and socket are unversioned (php-fpm.service, /run/php-fpm/php-fpm.sock)
+function php_service_version() {
+    echo ""
+}

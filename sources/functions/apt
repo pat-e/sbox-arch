@@ -1,0 +1,10 @@
+#!/bin/bash
+# Compatibility wrapper sourcing Arch Linux pacman/paru package manager functions
+# GPLv3 Applies
+
+#shellcheck source=sources/functions/pacman
+if [[ -f /etc/swizzin/sources/functions/pacman ]]; then
+    . /etc/swizzin/sources/functions/pacman
+else
+    . "$(dirname "${BASH_SOURCE[0]}")/pacman"
+fi

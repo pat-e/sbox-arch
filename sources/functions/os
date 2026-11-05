@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Returns the distribution of the device as seen in `/etc/os-release`.
+# \
+# Output examples:
+# - `arch`
+# - `archarm`
+_os_distro() {
+    source /etc/os-release
+    printf '%s' "$ID"
+}
+export -f _os_distro
+
+# Returns the codename of the device as seen in `/etc/os-release` (defaults to `rolling` on Arch Linux).
+# \
+# Output examples:
+# - `rolling`
+_os_codename() {
+    source /etc/os-release
+    printf '%s' "${VERSION_CODENAME:-rolling}"
+}
+export -f _os_codename
+
+# Returns the architecture of the device mapped from `uname -m`.
+# \
+# Possible output is one of the following:
+# - `amd64` (x86_64 essentially)
+# - `arm64`
+# - `armhf`
+_os_arch() {
+    case "$(uname -m)" in
+        x86_64)
+            printf '%s' "amd64"
+            ;;
+        aarch64)
+            printf '%s' "arm64"
+            ;;
+        armv7* | armv6*)
+            printf '%s' "armhf"
+            ;;
+        *)
+            uname -m
+            ;;
+    esac
+}
+export -f _os_arch

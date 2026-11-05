@@ -1,0 +1,10 @@
+#!/bin/bash
+
+function install_fpm() {
+    if ! command -v fpm > /dev/null 2>&1; then
+        pac_install ruby libffi base-devel
+        echo_progress_start "Installing fpm through ruby/gem"
+        gem install --no-user-install -n /usr/local/bin fpm >> $log 2>&1
+        echo_progress_done
+    fi
+}

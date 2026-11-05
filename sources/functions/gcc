@@ -1,0 +1,6 @@
+#!/bin/bash
+# Arch Linux ships a current GCC toolchain in base-devel
+
+GCC_Jammy_Upgrade() {
+    :
+}
