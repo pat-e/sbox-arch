@@ -16,7 +16,4 @@ rm_if_exists "/srv/panel"
 rm_if_exists "/etc/sudoers.d/panel"
 rm_if_exists "/etc/cron.d/set_interface"
 
-# rm_if_exists "/srv/organizr"
-rm_if_exists "/install/.organizr.lock"
-
 rm /install/.nginx.lock

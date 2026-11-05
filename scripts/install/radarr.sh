@@ -103,14 +103,6 @@ fi
 _install_radarr
 _nginx_radarr
 
-if [[ -f /install/.ombi.lock ]]; then
-    echo_info "Please adjust your Ombi setup accordingly"
-fi
-
-if [[ -f /install/.tautulli.lock ]]; then
-    echo_info "Please adjust your Tautulli setup accordingly"
-fi
-
 if [[ -f /install/.bazarr.lock ]]; then
     echo_info "Please adjust your Bazarr setup accordingly"
 fi

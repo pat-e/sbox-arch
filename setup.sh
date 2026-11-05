@@ -244,7 +244,7 @@ function _choices() {
     whiptail --title "Install Software" --checklist --noitem --separate-output "Choose your clients and core features." 15 26 7 "${packages[@]}" 2> /root/results || exit 1
     results=/root/results
     if grep -q rtorrent "$results"; then
-        gui=(rutorrent flood)
+        gui=(rutorrent)
         for i in "${gui[@]}"; do
             app=${i}
             if [[ ! -f /install/.$app.lock ]]; then

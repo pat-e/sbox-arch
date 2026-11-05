@@ -209,15 +209,15 @@ function _help() {
     echo
     printf "${sgformat}" "install"
     echo -e "The install function requires at least one package name as an argument but will accept multiples" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
-    echo -e "               Example: box install quassel syncthing znc" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
+    echo -e "               Example: box install syncthing znc" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
     echo
     printf "${sgformat}" "remove"
     echo -e "The remove function requires at least one package name as an argument but will accept multiples" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
-    echo -e "               Example: box remove quassel syncthing znc" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
+    echo -e "               Example: box remove syncthing znc" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
     echo
     printf "${sgformat}" "upgrade"
     echo -e "Runs the associated upgrade script." | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
-    echo -e "               Example: box upgrade plex curl" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
+    echo -e "               Example: box upgrade nginx curl" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
     echo
     printf "${sgformat}" "adduser"
     echo -e "The adduser function requires a single user to be specified, this user will be created" | fmt --goal=50 | sed -e "2,\$s/^/$spacing/"
@@ -306,7 +306,7 @@ function _adduser() {
     echo "D /var/run/${user} 0750 ${user} ${user} -" >> /etc/tmpfiles.d/"${user}".conf
     systemd-tmpfiles /etc/tmpfiles.d/"${user}".conf --create >> $log 2>&1
 
-    for app in rtorrent rutorrent deluge autobrr flood netronome nzbget lounge transmission wireguard organizr qbittorrent qui; do
+    for app in rtorrent rutorrent deluge autobrr netronome nzbget transmission wireguard qbittorrent qui; do
         if [[ -f /install/.${app}.lock ]]; then
             case $app in
                 deluge)
@@ -342,7 +342,7 @@ function _adduser() {
         echo "$user:$pass" > /root/.master.info
     elif [[ -z $SETUP_USER ]]; then # Only for non-master users, therefore only if this is not coming from setup.sh
         cat > /etc/sudoers.d/"${user}" << SUD
-Cmnd_Alias   ${USER}CMDS = /bin/systemctl stop flood@${user}, /bin/systemctl restart flood@${user}, /bin/systemctl start flood@${user}, /bin/systemctl start rtorrent@${user}, /bin/systemctl stop rtorrent@${user}, /bin/systemctl restart rtorrent@${user}, /bin/systemctl start deluged@${user}, /bin/systemctl stop deluged@${user}, /bin/systemctl restart deluged@${user}, /bin/systemctl start deluge-web@${user}, /bin/systemctl stop deluge-web@${user}, /bin/systemctl restart deluge-web@${user}, /bin/systemctl start irssi@${user}, /bin/systemctl stop irssi@${user}, /bin/systemctl restart irssi@${user}, /bin/systemctl start qbittorrent@${user}, /bin/systemctl stop qbittorrent@${user}, /bin/systemctl restart qbittorrent@${user}, /usr/local/bin/swizzin/box chpasswd ${user}
+Cmnd_Alias   ${USER}CMDS = /bin/systemctl start rtorrent@${user}, /bin/systemctl stop rtorrent@${user}, /bin/systemctl restart rtorrent@${user}, /bin/systemctl start deluged@${user}, /bin/systemctl stop deluged@${user}, /bin/systemctl restart deluged@${user}, /bin/systemctl start deluge-web@${user}, /bin/systemctl stop deluge-web@${user}, /bin/systemctl restart deluge-web@${user}, /bin/systemctl start irssi@${user}, /bin/systemctl stop irssi@${user}, /bin/systemctl restart irssi@${user}, /bin/systemctl start qbittorrent@${user}, /bin/systemctl stop qbittorrent@${user}, /bin/systemctl restart qbittorrent@${user}, /usr/local/bin/swizzin/box chpasswd ${user}
 
 ${user}     ALL = (ALL) NOPASSWD: ${USER}CMDS
 SUD
@@ -370,7 +370,7 @@ function _deluser() {
     echo_warn "This will delete the user '${user}' and all associated configs and subdirectories.\nTHIS ACTION CANNOT BE UNDONE.\nRemoval will start as soon as you confirm this message."
     ask "Are you sure you want to continue?" N || exit 1
 
-    for app in rtorrent rutorrent deluge autodl flood nzbget lounge transmission wireguard organizr qbittorrent autobrr netronome qui; do
+    for app in rtorrent rutorrent deluge autodl nzbget transmission wireguard qbittorrent autobrr netronome qui; do
         if [[ -f /install/.${app}.lock ]]; then
             case $app in
                 autodl)
@@ -381,13 +381,6 @@ function _deluser() {
                     rm -rf /etc/nginx/conf.d/${user}.deluge.conf
                     eval systemctl disable ${app}@${user}
                     eval systemctl stop ${app}@${user}
-                    ;;
-                lounge)
-                    su -s /bin/sh lounge -c "thelounge remove ${user}" > /dev/null
-                    ;;
-                organizr)
-                    #TODO automate removal steps
-                    echo_info "Remember to manually remove the organizr account!"
                     ;;
                 rutorrent)
                     if [[ ! -f /install/.rutorrent.lock ]]; then touch /install/.rutorrent.lock; fi
@@ -447,7 +440,7 @@ function _chpasswd() {
     htpasswd -b /etc/htpasswd $user "$pass" >> $log 2>&1
     mkdir -p /etc/htpasswd.d/
     htpasswd -b -c /etc/htpasswd.d/htpasswd.${user} $user "$pass" >> $log 2>&1
-    for app in autobrr deluge lounge netronome organizr qbittorrent qui transmission; do
+    for app in autobrr deluge netronome qbittorrent qui transmission; do
         if [[ -f /install/.${app}.lock ]]; then
             case $app in
                 autobrr)
@@ -471,18 +464,11 @@ function _chpasswd() {
                     systemctl start deluged@${user} >> $log 2>&1
                     systemctl start deluge-web@${user} >> $log 2>&1
                     ;;
-                lounge)
-                    su -s /bin/sh lounge -c "thelounge reset $user " <<< "${pass}" >> $log 2>&1
-                    ;;
                 netronome)
                     echo -n "$pass" | /usr/bin/netronome --config "/home/$user/.config/netronome/config.toml" change-password "$user"
                     ;;
                 qui)
                     /usr/bin/qui change-password --config-dir "/home/$user/.config/qui/" --username "$user" --new-password "$pass"
-                    ;;
-                organizr)
-                    #TODO fix when API allows to
-                    echo_warn "Remember to manually change the organizr account's password!"
                     ;;
                 qbittorrent)
                     . /etc/swizzin/sources/functions/qbittorrent

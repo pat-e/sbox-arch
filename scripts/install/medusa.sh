@@ -6,28 +6,6 @@ user=$(cut -d: -f1 < /root/.master.info)
 #shellcheck source=sources/functions/utils
 . /etc/swizzin/sources/functions/utils
 
-if [[ $(systemctl is-active sickgear) == "active" ]]; then
-    active=sickgear
-fi
-
-if [[ $(systemctl is-active sickchill) == "active" ]]; then
-    active=sickchill
-fi
-
-if [[ -n $active ]]; then
-    echo_info "SickChill and Medusa and Sickgear cannot be active at the same time.\nDo you want to disable $active and continue with the installation?\nDon't worry, your install will remain at /opt/$active"
-    if ask "Do you want to disable $active?" Y; then
-        disable=yes
-    fi
-    if [[ $disable == "yes" ]]; then
-        echo_progress_start "Disabling service"
-        systemctl disable -q --now ${active} >> ${log} 2>&1
-        echo_progress_done
-    else
-        exit 1
-    fi
-fi
-
 mkdir -p /opt/.venv
 chown ${user}: /opt/.venv
 

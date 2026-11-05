@@ -19,17 +19,6 @@ for u in "${users[@]}"; do
     fi
 done
 
-for u in "${users[@]}"; do
-    if [[ $u = "$master" ]]; then continue; fi
-    USER=${u^^}
-    if grep -q flood /etc/sudoers.d/$u; then
-        :
-    else
-        echo_info "Adding flood sudo permissions for $u"
-        sed -i "s/${USER}CMDS = /${USER}CMDS = \/bin\/systemctl stop flood@${user}, \/bin\/systemctl restart flood@${user}, \/bin\/systemctl start flood@${user}, /g" /etc/sudoers.d/$u
-    fi
-done
-
 if [[ -f /etc/sudoers.d/panel ]]; then
     if grep -q -E "(sed|grep|box|drop_caches|set_interface|pkill|killall|reload|vnstat|ifstat|PACKAGECMNDS)" /etc/sudoers.d/panel; then
         echo_info "Fixing sudo permissions for panel"

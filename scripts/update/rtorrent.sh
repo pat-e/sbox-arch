@@ -46,13 +46,4 @@ for u in "${users[@]}"; do
             echo_progress_done
         fi
     fi
-    if [[ -f /home/${u}/.flood/config.js ]]; then
-        if grep -q "socket: false" /home/${u}/.flood/config.js; then
-            echo_progress_start "Updating flood config.js to use sockets for ${u}"
-            sed -i "s/socket: false/socket: true/g" /home/${u}/.flood/config.js
-            sed -i "s/socketPath.*/socketPath: '\/var\/run\/${u}\/.rtorrent.sock'/g" /home/${u}/.flood/config.js
-            systemctl try-restart flood@${u}
-            echo_progress_done
-        fi
-    fi
 done

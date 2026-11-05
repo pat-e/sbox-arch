@@ -1,8 +1,8 @@
 #!/bin/bash
 users=($(cut -d: -f1 < /etc/htpasswd))
 
-if [[ -f /install/.rutorrent.lock || -f /install/.flood.lock ]]; then
-    if ! ask "This will remove ruTorrent&/Flood. Continue?" Y; then
+if [[ -f /install/.rutorrent.lock ]]; then
+    if ! ask "This will remove ruTorrent. Continue?" Y; then
         exit 0
     fi
 fi
@@ -18,7 +18,7 @@ echo_progress_start "Removing old rTorrent binaries and libraries ... "
 remove_rtorrent
 echo_progress_done
 
-for a in rutorrent flood; do
+for a in rutorrent; do
     if [[ -f /install/.$a.lock ]]; then
         /usr/local/bin/swizzin/remove/$a.sh
     fi

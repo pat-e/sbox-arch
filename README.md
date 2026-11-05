@@ -20,7 +20,7 @@ This project is an independent, heavily modified conversion of **[Swizzin](https
   - Web server and PHP-FPM run under the native Arch `http` user/group (`/run/php-fpm/php-fpm.sock`, `php-fpm.service`, `/etc/php/php.ini`).
   - Administrative privileges use the `wheel` group (`/etc/sudoers.d/wheel`).
   - Unprivileged daemon accounts use `nobody` and standard `useradd`/`userdel` tooling.
-- **Native Arch & AUR Packages Preferred**: Uses official Arch repository and AUR packages wherever possible (`deluge`, `qbittorrent-nox`, `rtorrent`, `transmission-cli`, `jellyfin-server`, `emby-server`, `plex-media-server`, `syncthing`, `rclone`, `wireguard-tools`, `quassel-core`, `znc`, etc.).
+- **Native Arch & AUR Packages Preferred**: Uses official Arch repository and AUR packages wherever possible (`deluge`, `qbittorrent-nox`, `rtorrent`, `transmission-cli`, `jellyfin-server`, `syncthing`, `rclone`, `wireguard-tools`, `znc`, etc.).
 
 ---
 
@@ -84,7 +84,7 @@ Once installed, the `box` command is available in your `PATH`:
 | `box list` | List all available application packages and descriptions | `box list` |
 | `box install <pkg...>` | Install one or more applications | `box install nginx qbittorrent jellyfin` |
 | `box remove <pkg...>` | Remove one or more installed applications | `box remove sonarr radarr` |
-| `box upgrade <pkg...>` | Run the upgrade script for one or more packages | `box upgrade nginx plex` |
+| `box upgrade <pkg...>` | Run the upgrade script for one or more packages | `box upgrade nginx deluge` |
 | `box update` | Pull the latest `sbox-arch` changes and run update hooks | `box update` |
 | `box adduser <user>` | Create a new user account | `box adduser alice` |
 | `box deluser <user>` | Delete a user account and its associated data | `box deluser alice` |

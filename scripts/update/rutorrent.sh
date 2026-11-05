@@ -37,23 +37,6 @@ if [ -f /install/.rutorrent.lock ]; then
         fi
     fi
 
-    if [[ -f /install/.flood.lock ]]; then
-        users=($(cut -d: -f1 < /etc/htpasswd))
-        for user in ${users[@]}; do
-            if [[ ! -f /etc/nginx/apps/${user}.scgi.conf ]]; then
-                reloadnginx=1
-                cat > /etc/nginx/apps/${user}.scgi.conf << RUC
-location /${user} {
-    include scgi_params;
-    scgi_pass unix:/var/run/${user}/.rtorrent.sock;
-    auth_basic "What's the password?";
-    auth_basic_user_file /etc/htpasswd.d/htpasswd.${user};
-}
-RUC
-            fi
-        done
-    fi
-
     if [[ $reloadnginx == 1 ]]; then
         echo_progress_start "Reloading nginx due to ruTorrent config updates"
         systemctl reload nginx
