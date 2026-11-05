@@ -49,5 +49,4 @@ $L['SYNCTHING'] = 'Open Source Continuous File Synchronization with BitTorrent.'
 $L['TRANSMISSION'] = 'A simple, lightweight and stable torrent client with a built-in web UI and an RPC interface.';
 $L['VSFTPD'] = 'An FTP server to access your machine\'s files remotely ';
 $L['WIREGUARD'] = 'A VPN-style solution to allow you to route all your personal traffic from your personal device through your machine.';
-$L['X2GO'] = 'X2Go is an open source remote desktop software for Linux that uses the NX technology protocol.';
 $L['ZNC'] = 'ZNC is an IRC network bouncer or BNC. It can detach the client from the actual IRC server, and also from selected channels.';
